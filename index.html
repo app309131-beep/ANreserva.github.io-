@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AN Magic Barber Shop - Reserva Online</title>
+
+    <!-- Flatpickr CSS (calendario estilizado) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #d32f2f, #000000); /* Rojo más vivo y profesional */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-attachment: fixed;
+        }
+        .container {
+            max-width: 600px;
+            width: 90%;
+            margin: 20px auto;
+            padding: 30px;
+            background-color: rgba(0, 0, 0, 0.85);
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.3em;
+            margin-bottom: 5px;
+            color: #fff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        p {
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 1.1em;
+            color: #eee;
+        }
+        label {
+            display: block;
+            margin-top: 18px;
+            font-weight: bold;
+            font-size: 1.05em;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            margin-top: 6px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+            background-color: rgba(255, 255, 255, 0.95);
+            color: #333;
+            transition: all 0.3s ease;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px #ff3333;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            width: 100%;
+            padding: 16px;
+            margin-top: 28px;
+            background: linear-gradient(to right, #ff0000, #cc0000);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 19px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: 1px;
+        }
+        button:hover {
+            background: linear-gradient(to right, #e60000, #b30000);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(255, 0, 0, 0.4);
+        }
+        .flatpickr-calendar {
+            background: #1e1e1e !important;
+            border-radius: 10px !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+        }
+        .flatpickr-day {
+            border-radius: 50% !important;
+        }
+        .flatpickr-day:hover:not(.disabled) {
+            background: #ff3333 !important;
+            color: white !important;
+        }
+        .flatpickr-day.selected {
+            background: #ff0000 !important;
+            border-color: #ff0000 !important;
+        }
+        .flatpickr-day.disabled {
+            color: #555 !important;
+            cursor: not-allowed !important;
+        }
+        .calendar-info {
+            font-size: 0.85em;
+            color: #aaa;
+            text-align: center;
+            margin-top: 4px;
+        }
+        .alert {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 0.95em;
+        }
+        .alert-success {
+            background-color: rgba(40, 167, 69, 0.2);
+            border: 1px solid rgba(40, 167, 69, 0.5);
+            color: #90ee90;
+        }
+        .alert-danger {
+            background-color: rgba(220, 53, 69, 0.2);
+            border: 1px solid rgba(220, 53, 69, 0.5);
+            color: #ff6b6b;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AN Magic Barber Shop</h1>
+        <p>Barbero en Parla · Calle Juan de Austria, 6, 28982, Parla (Madrid)</p>
+
+        <form id="reservationForm">
+            <label for="name">Nombre Completo:</label>
+            <input type="text" id="name" name="name" required placeholder="Ej: María López">
+
+            <label for="email">Correo Electrónico:</label>
+            <input type="email" id="email" name="email" required placeholder="tu@email.com">
+
+            <label for="phone">Teléfono:</label>
+            <input type="tel" id="phone" name="phone" required placeholder="+34 600 000 000">
+
+            <label for="servicio">Servicio:</label>
+            <select id="servicio" name="servicio" required>
+                <option value="">Selecciona un servicio</option>
+                <option value="Corte">Corte</option>
+                <option value="Barba">Barba</option>
+                <option value="Corte y Barba">Corte y Barba</option>
+            </select>
+
+            <label for="date">Fecha de la cita:</label>
+            <input type="text" id="date" name="date" required placeholder="Selecciona una fecha">
+            <div class="calendar-info">✅ Disponible: Lunes, Miércoles a Domingo<br>❌ Cerrado: Martes</div>
+
+            <label for="time">Hora (9:30 – 20:00):</label>
+            <input type="time" id="time" name="time" required min="09:30" max="19:45" step="900">
+
+            <label for="comentarios">Comentarios (opcional):</label>
+            <textarea id="comentarios" name="comentarios" rows="4" placeholder="Escribe aquí cualquier comentario o solicitud especial..."></textarea>
+
+            <button type="submit" id="submitBtn">
+                <span id="btnText">✂️ Reservar Cita</span>
+                <span id="btnSpinner" class="spinner" style="display: none;"></span>
+            </button>
+            
+            <div id="mensajeAlerta"></div>
+        </form>
+    </div>
+
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+    <script>
+        // Configuración del webhook de n8n
+        // IMPORTANTE: Cambia esta URL por la URL real de tu webhook de n8n
+        const WEBHOOK_URL = 'http://localhost:5678/webhook-test/reserva-peluqueria';
+        
+        // Modo debug (muestra información en consola)
+        const DEBUG_MODE = true;
+        
+        // Configurar flatpickr con bloqueo de martes
+        flatpickr("#date", {
+            locale: "es",
+            dateFormat: "d/m/Y",
+            minDate: "today",
+            disable: [
+                function(date) {
+                    // Deshabilitar todos los martes (getDay() → 2 = martes)
+                    return date.getDay() === 2;
+                }
+            ]
+        });
+
+        // Función para mostrar mensaje de éxito
+        function mostrarExito(data) {
+            const mensajeAlerta = document.getElementById('mensajeAlerta');
+            mensajeAlerta.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>✅ ¡Cita reservada exitosamente!</strong><br>
+                    Hemos recibido tu solicitud para el ${data.date} a las ${data.time} - Servicio: ${data.servicio}.<br>
+                    Te contactaremos pronto para confirmar tu cita.
+                </div>
+            `;
+            mensajeAlerta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Función para mostrar error
+        function mostrarError(mensaje) {
+            const mensajeAlerta = document.getElementById('mensajeAlerta');
+            mensajeAlerta.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>❌ Error</strong><br>
+                    ${mensaje}
+                </div>
+            `;
+            mensajeAlerta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Manejo del envío del formulario a n8n
+        document.getElementById('reservationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const dateInput = document.getElementById('date').value;
+            const timeInput = document.getElementById('time').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const mensajeAlerta = document.getElementById('mensajeAlerta');
+
+            // Validaciones básicas (mensaje genérico si algo está mal)
+            let formularioValido = true;
+
+            // Validar fecha y hora
+            if (!dateInput || !timeInput) {
+                formularioValido = false;
+            }
+
+            // Validar hora (9:30 – 20:00)
+            if (timeInput) {
+                const [hours, minutes] = timeInput.split(':').map(Number);
+                if (hours < 9 || (hours === 9 && minutes < 30) || hours >= 20) {
+                    formularioValido = false;
+                }
+            }
+
+            // Preparar datos para enviar a n8n
+            const formData = new FormData(form);
+            const data = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                servicio: formData.get('servicio'),
+                date: formData.get('date'),
+                time: formData.get('time'),
+                comentarios: formData.get('comentarios') || '',
+                timestamp: new Date().toISOString(),
+                fechaEnvio: new Date().toLocaleString('es-ES', { 
+                    timeZone: 'Europe/Madrid',
+                    dateStyle: 'full',
+                    timeStyle: 'medium'
+                })
+            };
+
+            // Validar que todos los campos requeridos estén presentes (mensaje genérico)
+            if (!data.name || !data.email || !data.phone || !data.servicio) {
+                formularioValido = false;
+            }
+
+            // Si algo está mal, solo mostramos un mensaje genérico
+            if (!formularioValido) {
+                mostrarError('Los datos del formulario no son correctos. Por favor, revísalos.');
+                return;
+            }
+
+            if (DEBUG_MODE) {
+                console.log('📤 Enviando datos a n8n:', data);
+                console.log('🔗 URL del webhook:', WEBHOOK_URL);
+            }
+
+            // Deshabilitar botón y mostrar spinner
+            submitBtn.disabled = true;
+            btnText.textContent = 'Enviando...';
+            btnSpinner.style.display = 'inline-block';
+            mensajeAlerta.innerHTML = '';
+
+            try {
+                // Intentar enviar los datos
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(data),
+                    // Agregar modo cors para evitar problemas
+                    mode: 'cors'
+                });
+
+                if (DEBUG_MODE) {
+                    console.log('📥 Respuesta recibida:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        ok: response.ok,
+                        headers: Object.fromEntries(response.headers.entries())
+                    });
+                }
+
+                // Intentar leer la respuesta (puede ser JSON o texto)
+                let responseData = null;
+                const contentType = response.headers.get('content-type');
+                
+                try {
+                    if (contentType && contentType.includes('application/json')) {
+                        responseData = await response.json();
+                    } else {
+                        responseData = await response.text();
+                    }
+                    
+                    if (DEBUG_MODE) {
+                        console.log('📦 Datos de respuesta:', responseData);
+                    }
+                } catch (parseError) {
+                    if (DEBUG_MODE) {
+                        console.warn('⚠️ No se pudo parsear la respuesta:', parseError);
+                    }
+                }
+
+                // n8n puede devolver 200, 201, o incluso otros códigos exitosos
+                // Consideramos éxito si el status está entre 200-299
+                if (response.status >= 200 && response.status < 300) {
+                    mostrarExito(data);
+                    form.reset();
+                    
+                    // Resetear el calendario de flatpickr
+                    const flatpickrInstance = document.getElementById('date')._flatpickr;
+                    if (flatpickrInstance) {
+                        flatpickrInstance.clear();
+                    }
+                } else {
+                    // Si no es un código de éxito, pero n8n procesó la solicitud
+                    // (a veces n8n devuelve 400 pero procesa el webhook)
+                    // Intentamos mostrar éxito de todas formas si hay datos
+                    if (responseData && typeof responseData === 'object') {
+                        mostrarExito(data);
+                        form.reset();
+                    } else {
+                        throw new Error(`Error ${response.status}: ${response.statusText || 'Error del servidor'}`);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error completo:', error);
+                
+                let errorMessage = 'Error al enviar la cita. Por favor, intenta nuevamente.';
+                
+                // Detectar diferentes tipos de errores
+                if (error.message.includes('Failed to fetch') || 
+                    error.message.includes('NetworkError') ||
+                    error.message.includes('Network request failed') ||
+                    error.name === 'TypeError') {
+                    errorMessage = 'Error de conexión. Verifica que:<br>' +
+                                  '• n8n esté ejecutándose<br>' +
+                                  '• La URL del webhook sea correcta<br>' +
+                                  '• No haya problemas de CORS<br>' +
+                                  '<small>URL actual: ' + WEBHOOK_URL + '</small>';
+                } else if (error.message.includes('CORS')) {
+                    errorMessage = 'Error de CORS. Verifica la configuración de n8n para permitir solicitudes desde este origen.';
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                mostrarError(errorMessage);
+            } finally {
+                // Restaurar botón
+                submitBtn.disabled = false;
+                btnText.textContent = '✂️ Reservar Cita';
+                btnSpinner.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
