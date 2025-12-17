@@ -90,12 +90,14 @@
             box-shadow: 0 6px 15px rgba(255, 0, 0, 0.4);
         }
         .flatpickr-calendar {
-            background: #1e1e1e !important;
+            background: #ffffff !important;
             border-radius: 10px !important;
             box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+            color: #333 !important;
         }
         .flatpickr-day {
             border-radius: 50% !important;
+            color: #333 !important;
         }
         .flatpickr-day:hover:not(.disabled) {
             background: #ff3333 !important;
@@ -104,10 +106,23 @@
         .flatpickr-day.selected {
             background: #ff0000 !important;
             border-color: #ff0000 !important;
+            color: white !important;
         }
         .flatpickr-day.disabled {
-            color: #555 !important;
+            color: #ccc !important;
             cursor: not-allowed !important;
+        }
+        .flatpickr-month {
+            color: #333 !important;
+        }
+        .flatpickr-weekdays {
+            background: #f5f5f5 !important;
+        }
+        .flatpickr-weekday {
+            color: #333 !important;
+        }
+        .flatpickr-current-month {
+            color: #333 !important;
         }
         .calendar-info {
             font-size: 0.85em;
@@ -174,12 +189,20 @@
                 <option value="Corte y Barba">Corte y Barba</option>
             </select>
 
+            <label for="peluquero">Peluquero:</label>
+            <select id="peluquero" name="peluquero" required>
+                <option value="">Selecciona un peluquero</option>
+                <option value="Ayoub">Ayoub</option>
+                <option value="Nabil">Nabil</option>
+            </select>
+
             <label for="date">Fecha de la cita:</label>
             <input type="text" id="date" name="date" required placeholder="Selecciona una fecha">
-            <div class="calendar-info">✅ Disponible: Lunes, Miércoles a Domingo<br>❌ Cerrado: Martes</div>
+            <div class="calendar-info">✅ Horarios:<br>Lunes a Sábado: 9:30 - 20:00<br>Martes: 15:30 - 21:00<br>Domingo: 10:00 - 14:00</div>
 
-            <label for="time">Hora (9:30 – 20:00):</label>
+            <label for="time">Hora:</label>
             <input type="time" id="time" name="time" required min="09:30" max="19:45" step="900">
+            <div id="horasInfo" style="font-size: 0.85em; color: #aaa; margin-top: 4px;"></div>
 
             <label for="comentarios">Comentarios (opcional):</label>
             <textarea id="comentarios" name="comentarios" rows="4" placeholder="Escribe aquí cualquier comentario o solicitud especial..."></textarea>
@@ -187,10 +210,10 @@
             <button type="submit" id="submitBtn">
                 <span id="btnText">✂️ Reservar Cita</span>
                 <span id="btnSpinner" class="spinner" style="display: none;"></span>
-            </button>
+    </button>
             
             <div id="mensajeAlerta"></div>
-        </form>
+      </form>
     </div>
 
     <!-- Flatpickr JS -->
@@ -201,20 +224,224 @@
         // IMPORTANTE: Cambia esta URL por la URL real de tu webhook de n8n
         const WEBHOOK_URL = 'http://localhost:5678/webhook-test/reserva-peluqueria';
         
+        // URL para consultar horas reservadas (debe ser un endpoint GET en n8n)
+        // Si no tienes un endpoint separado, puedes usar el mismo webhook con método GET
+        const WEBHOOK_CONSULTA_URL = 'http://localhost:5678/webhook/consultar-reservas';
+        
         // Modo debug (muestra información en consola)
         const DEBUG_MODE = true;
         
-        // Configurar flatpickr con bloqueo de martes
-        flatpickr("#date", {
+        // Variable para almacenar horas reservadas (formato: { fecha: { hora: [peluqueros] } })
+        let horasReservadas = {};
+        
+        // Función para consultar horas reservadas desde n8n
+        // NOTA: Necesitas crear un webhook en n8n que reciba la fecha y peluquero como parámetros GET
+        // y devuelva un array de horas reservadas en formato ["10:00", "11:30", "15:00"]
+        // Ejemplo de respuesta esperada: ["10:00", "11:30"] o { "horas": ["10:00", "11:30"] }
+        async function consultarHorasReservadas(fecha, peluquero = null) {
+            // Si no hay URL de consulta configurada, no validar horas reservadas
+            if (!WEBHOOK_CONSULTA_URL || WEBHOOK_CONSULTA_URL === '') {
+                horasReservadas = [];
+                return;
+            }
+            
+            try {
+                // Convertir fecha de formato d/m/Y a formato para consulta (YYYY-MM-DD)
+                const partesFecha = fecha.split('/');
+                const fechaConsulta = `${partesFecha[2]}-${partesFecha[1]}-${partesFecha[0]}`;
+                
+                // Construir URL con fecha y peluquero si está disponible
+                let urlConsulta = `${WEBHOOK_CONSULTA_URL}?fecha=${fechaConsulta}`;
+                if (peluquero) {
+                    urlConsulta += `&peluquero=${encodeURIComponent(peluquero)}`;
+                }
+                
+                // Consultar horas reservadas (ajusta la URL según tu configuración de n8n)
+                const response = await fetch(urlConsulta, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    let horasArray = [];
+                    
+                    // Esperamos que n8n devuelva un array de horas reservadas: ["10:00", "11:30", ...]
+                    // O un objeto con la propiedad horas: { horas: ["10:00", "11:30"] }
+                    if (Array.isArray(data)) {
+                        horasArray = data;
+                    } else if (data.horas && Array.isArray(data.horas)) {
+                        horasArray = data.horas;
+                    } else if (data.reservas && Array.isArray(data.reservas)) {
+                        // También aceptar formato: { reservas: [{time: "10:00", peluquero: "Ayoub"}, ...] }
+                        horasArray = data.reservas.map(r => {
+                            if (typeof r === 'string') return r;
+                            return r.time || r.hora || r;
+                        }).filter(Boolean);
+                    }
+                    
+                    // Almacenar por fecha y peluquero
+                    const clave = peluquero ? `${fecha}_${peluquero}` : fecha;
+                    horasReservadas[clave] = horasArray;
+                } else {
+                    const clave = peluquero ? `${fecha}_${peluquero}` : fecha;
+                    horasReservadas[clave] = [];
+                }
+            } catch (error) {
+                // Si hay error al consultar, no bloquear el formulario pero mostrar advertencia
+                if (DEBUG_MODE) {
+                    console.warn('No se pudieron consultar las horas reservadas. El formulario funcionará sin validación de disponibilidad:', error);
+                }
+                const clave = peluquero ? `${fecha}_${peluquero}` : fecha;
+                horasReservadas[clave] = [];
+            }
+        }
+        
+        // Función para validar si una hora está reservada para un peluquero específico
+        function horaEstaReservada(hora, fecha, peluquero) {
+            // Si hay peluquero, buscar específicamente para ese peluquero
+            if (peluquero) {
+                const clave = `${fecha}_${peluquero}`;
+                const horas = horasReservadas[clave] || [];
+                return horas.includes(hora);
+            }
+            // Si no hay peluquero, verificar en todas las reservas de esa fecha
+            const horas = horasReservadas[fecha] || [];
+            return horas.includes(hora);
+        }
+        
+        // Función para validar hora antes de enviar
+        function validarHoraDisponible(hora, fecha) {
+            if (horaEstaReservada(hora)) {
+                return false;
+            }
+            return true;
+        }
+        
+        // Configurar flatpickr (todos los días disponibles)
+        const datePicker = flatpickr("#date", {
             locale: "es",
             dateFormat: "d/m/Y",
             minDate: "today",
-            disable: [
-                function(date) {
-                    // Deshabilitar todos los martes (getDay() → 2 = martes)
-                    return date.getDay() === 2;
+            onChange: async function(selectedDates, dateStr, instance) {
+                // Ajustar límites de hora según el día seleccionado
+                const timeInput = document.getElementById('time');
+                const horasInfo = document.getElementById('horasInfo');
+                
+                if (selectedDates.length > 0) {
+                    const fechaSeleccionada = selectedDates[0];
+                    const diaSemana = fechaSeleccionada.getDay(); // 0=Domingo, 1=Lunes, 2=Martes, etc.
+                    
+                    // Consultar horas reservadas para esta fecha
+                    horasInfo.textContent = 'Consultando disponibilidad...';
+                    // Obtener el peluquero seleccionado si existe
+                    const peluqueroSeleccionado = document.getElementById('peluquero')?.value || null;
+                    await consultarHorasReservadas(dateStr, peluqueroSeleccionado);
+                    
+                    // Domingo (0): 10:00 - 14:00
+                    if (diaSemana === 0) {
+                        timeInput.setAttribute('min', '10:00');
+                        timeInput.setAttribute('max', '14:00');
+                        timeInput.setAttribute('step', '900');
+                    }
+                    // Martes (2): 15:30 - 21:00
+                    else if (diaSemana === 2) {
+                        timeInput.setAttribute('min', '15:30');
+                        timeInput.setAttribute('max', '21:00');
+                        timeInput.setAttribute('step', '900');
+                    }
+                    // Otros días: 9:30 - 20:00
+                    else {
+                        timeInput.setAttribute('min', '09:30');
+                        timeInput.setAttribute('max', '20:00');
+                        timeInput.setAttribute('step', '900');
+                    }
+                    
+                    // Limpiar el valor de hora si está fuera del rango válido o reservada
+                    if (timeInput.value) {
+                        const [hours, minutes] = timeInput.value.split(':').map(Number);
+                        let fueraRango = false;
+                        
+                        if (diaSemana === 0) {
+                            fueraRango = hours < 10 || hours > 14 || (hours === 14 && minutes > 0);
+                        } else if (diaSemana === 2) {
+                            fueraRango = hours < 15 || (hours === 15 && minutes < 30) || hours > 21 || (hours === 21 && minutes > 0);
+                        } else {
+                            fueraRango = hours < 9 || (hours === 9 && minutes < 30) || hours > 20 || (hours === 20 && minutes > 0);
+                        }
+                        
+                        // También verificar si está reservada
+                        if (!fueraRango && horaEstaReservada(timeInput.value)) {
+                            fueraRango = true;
+                        }
+                        
+                        if (fueraRango) {
+                            timeInput.value = '';
+                        }
+                    }
+                    
+                    // Mostrar información de horas reservadas
+                    const clave = peluqueroSeleccionado ? `${dateStr}_${peluqueroSeleccionado}` : dateStr;
+                    const horasOcupadas = horasReservadas[clave] || [];
+                    if (horasOcupadas.length > 0) {
+                        horasInfo.innerHTML = `⚠️ Horas no disponibles: ${horasOcupadas.join(', ')}`;
+                        horasInfo.style.color = '#ff6b6b';
+                    } else {
+                        horasInfo.textContent = '✅ Todas las horas están disponibles';
+                        horasInfo.style.color = '#90ee90';
+                    }
+                } else {
+                    horasInfo.textContent = '';
                 }
-            ]
+            }
+        });
+        
+        // Validar hora cuando el usuario la selecciona
+        document.getElementById('time').addEventListener('change', function() {
+            const horaSeleccionada = this.value;
+            const fechaSeleccionada = document.getElementById('date').value;
+            const peluqueroSeleccionado = document.getElementById('peluquero')?.value || null;
+            const horasInfo = document.getElementById('horasInfo');
+            
+            if (horaSeleccionada && fechaSeleccionada) {
+                if (horaEstaReservada(horaSeleccionada, fechaSeleccionada, peluqueroSeleccionado)) {
+                    horasInfo.innerHTML = `❌ Esta hora ya está reservada${peluqueroSeleccionado ? ' para ' + peluqueroSeleccionado : ''}. Por favor, selecciona otra.`;
+                    horasInfo.style.color = '#ff6b6b';
+                    this.value = '';
+                }
+            }
+        });
+        
+        // También consultar cuando cambia el peluquero
+        document.getElementById('peluquero').addEventListener('change', async function() {
+            const fechaSeleccionada = document.getElementById('date').value;
+            const peluqueroSeleccionado = this.value;
+            const horasInfo = document.getElementById('horasInfo');
+            
+            if (fechaSeleccionada && peluqueroSeleccionado) {
+                horasInfo.textContent = 'Consultando disponibilidad...';
+                await consultarHorasReservadas(fechaSeleccionada, peluqueroSeleccionado);
+                
+                const clave = `${fechaSeleccionada}_${peluqueroSeleccionado}`;
+                const horasOcupadas = horasReservadas[clave] || [];
+                if (horasOcupadas.length > 0) {
+                    horasInfo.innerHTML = `⚠️ Horas no disponibles: ${horasOcupadas.join(', ')}`;
+                    horasInfo.style.color = '#ff6b6b';
+                } else {
+                    horasInfo.textContent = '✅ Todas las horas están disponibles';
+                    horasInfo.style.color = '#90ee90';
+                }
+                
+                // Limpiar hora si está reservada para este peluquero
+                const horaActual = document.getElementById('time').value;
+                if (horaActual && horaEstaReservada(horaActual, fechaSeleccionada, peluqueroSeleccionado)) {
+                    document.getElementById('time').value = '';
+                    horasInfo.innerHTML = `❌ La hora seleccionada ya está reservada para ${peluqueroSeleccionado}. Por favor, selecciona otra.`;
+                    horasInfo.style.color = '#ff6b6b';
+                }
+            }
         });
 
         // Función para mostrar mensaje de éxito
@@ -223,7 +450,7 @@
             mensajeAlerta.innerHTML = `
                 <div class="alert alert-success">
                     <strong>✅ ¡Cita reservada exitosamente!</strong><br>
-                    Hemos recibido tu solicitud para el ${data.date} a las ${data.time} - Servicio: ${data.servicio}.<br>
+                    Hemos recibido tu solicitud para el ${data.date} a las ${data.time} - Servicio: ${data.servicio} - Peluquero: ${data.peluquero}.<br>
                     Te contactaremos pronto para confirmar tu cita.
                 </div>
             `;
@@ -237,7 +464,7 @@
                 <div class="alert alert-danger">
                     <strong>❌ Error</strong><br>
                     ${mensaje}
-                </div>
+  </div>
             `;
             mensajeAlerta.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -262,10 +489,70 @@
                 formularioValido = false;
             }
 
-            // Validar hora (9:30 – 20:00)
-            if (timeInput) {
+            // Obtener peluquero seleccionado
+            const peluqueroInput = document.getElementById('peluquero').value;
+            
+            // Consultar horas reservadas ANTES de validar (siempre consultar para tener datos actualizados)
+            if (dateInput && timeInput && peluqueroInput) {
+                // Mostrar mensaje de verificación
+                const horasInfo = document.getElementById('horasInfo');
+                if (horasInfo) {
+                    horasInfo.textContent = 'Verificando disponibilidad...';
+                    horasInfo.style.color = '#aaa';
+                }
+                
+                // Consultar con fecha y peluquero para validación precisa
+                await consultarHorasReservadas(dateInput, peluqueroInput);
+                
+                // Validar que la hora NO esté reservada para este peluquero ANTES de continuar
+                if (horaEstaReservada(timeInput, dateInput, peluqueroInput)) {
+                    if (horasInfo) {
+                        horasInfo.innerHTML = `❌ Esta hora ya está reservada para ${peluqueroInput}. Por favor, selecciona otra hora disponible.`;
+                        horasInfo.style.color = '#ff6b6b';
+                    }
+                    mostrarError(`Esta hora ya está reservada para ${peluqueroInput}. Por favor, selecciona otra hora disponible.`);
+                    return;
+                }
+            } else if (dateInput && timeInput) {
+                // Si no hay peluquero seleccionado, validar sin peluquero
+                await consultarHorasReservadas(dateInput);
+                if (horaEstaReservada(timeInput, dateInput, null)) {
+                    mostrarError('Esta hora ya está reservada. Por favor, selecciona otra hora disponible.');
+                    return;
+                }
+            }
+
+            // Validar hora según el día de la semana
+            if (timeInput && dateInput) {
                 const [hours, minutes] = timeInput.split(':').map(Number);
-                if (hours < 9 || (hours === 9 && minutes < 30) || hours >= 20) {
+                
+                // Convertir fecha de formato d/m/Y a Date
+                const partesFecha = dateInput.split('/');
+                const fechaSeleccionada = new Date(partesFecha[2], partesFecha[1] - 1, partesFecha[0]);
+                const diaSemana = fechaSeleccionada.getDay(); // 0=Domingo, 1=Lunes, 2=Martes, etc.
+                
+                let horaValida = false;
+                
+                // Domingo (0): 10:00 - 14:00
+                if (diaSemana === 0) {
+                    if (hours === 10 || (hours > 10 && hours < 14) || (hours === 14 && minutes === 0)) {
+                        horaValida = true;
+                    }
+                }
+                // Martes (2): 15:30 - 21:00
+                else if (diaSemana === 2) {
+                    if ((hours === 15 && minutes >= 30) || (hours > 15 && hours < 21) || (hours === 21 && minutes === 0)) {
+                        horaValida = true;
+                    }
+                }
+                // Otros días: 9:30 - 20:00
+                else {
+                    if ((hours === 9 && minutes >= 30) || (hours > 9 && hours < 20) || (hours === 20 && minutes === 0)) {
+                        horaValida = true;
+                    }
+                }
+                
+                if (!horaValida) {
                     formularioValido = false;
                 }
             }
@@ -277,6 +564,7 @@
                 email: formData.get('email'),
                 phone: formData.get('phone'),
                 servicio: formData.get('servicio'),
+                peluquero: formData.get('peluquero'),
                 date: formData.get('date'),
                 time: formData.get('time'),
                 comentarios: formData.get('comentarios') || '',
@@ -289,7 +577,7 @@
             };
 
             // Validar que todos los campos requeridos estén presentes (mensaje genérico)
-            if (!data.name || !data.email || !data.phone || !data.servicio) {
+            if (!data.name || !data.email || !data.phone || !data.servicio || !data.peluquero) {
                 formularioValido = false;
             }
 
