@@ -376,26 +376,8 @@
                 }
             } catch (error) {
                 console.error('❌ Error completo:', error);
-                
-                let errorMessage = 'Error al enviar la cita. Por favor, intenta nuevamente.';
-                
-                // Detectar diferentes tipos de errores
-                if (error.message.includes('Failed to fetch') || 
-                    error.message.includes('NetworkError') ||
-                    error.message.includes('Network request failed') ||
-                    error.name === 'TypeError') {
-                    errorMessage = 'Error de conexión. Verifica que:<br>' +
-                                  '• n8n esté ejecutándose<br>' +
-                                  '• La URL del webhook sea correcta<br>' +
-                                  '• No haya problemas de CORS<br>' +
-                                  '<small>URL actual: ' + WEBHOOK_URL + '</small>';
-                } else if (error.message.includes('CORS')) {
-                    errorMessage = 'Error de CORS. Verifica la configuración de n8n para permitir solicitudes desde este origen.';
-                } else if (error.message) {
-                    errorMessage = error.message;
-                }
-                
-                mostrarError(errorMessage);
+                // Mensaje genérico sin detectar tipos de error
+                mostrarError('Error del sistema');
             } finally {
                 // Restaurar botón
                 submitBtn.disabled = false;
